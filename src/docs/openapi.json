@@ -1,0 +1,183 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SIMADU API - Sistem Layanan Informasi dan Pengaduan Mahasiswa",
+    "version": "1.0.0",
+    "description": "REST API untuk pengelolaan pengaduan mahasiswa dengan autentikasi JWT dan otorisasi berbasis peran."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Server Lokal Pengembangan"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Pengaduan": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 1 },
+          "mahasiswaId": { "type": "string", "example": "240101001" },
+          "judul": { "type": "string", "example": "AC Ruang Kuliah Rusak" },
+          "kategori": { "type": "string", "enum": ["Fasilitas", "Akademik", "TI"], "example": "Fasilitas" },
+          "deskripsi": { "type": "string", "example": "AC tidak dingin sejak pagi." },
+          "status": { "type": "string", "enum": ["diajukan", "diproses", "selesai"], "example": "diajukan" },
+          "createdAt": { "type": "string", "format": "date-time", "example": "2026-11-20T08:00:00.000Z" }
+        }
+      },
+      "PengaduanInput": {
+        "type": "object",
+        "required": ["judul", "kategori", "deskripsi"],
+        "properties": {
+          "judul": { "type": "string", "example": "Proyektor Kelas Mati" },
+          "kategori": { "type": "string", "enum": ["Fasilitas", "Akademik", "TI"], "example": "Fasilitas" },
+          "deskripsi": { "type": "string", "example": "Proyektor di ruang 2.1 tidak menyala." }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "summary": "Login Pengguna (Mahasiswa atau Admin)",
+        "tags": ["Autentikasi"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password"],
+                "properties": {
+                  "username": { "type": "string", "example": "mhs1" },
+                  "password": { "type": "string", "example": "password123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Login berhasil dan token dikembalikan" },
+          "401": { "description": "Kredensial tidak valid" }
+        }
+      }
+    },
+    "/api/pengaduan": {
+      "get": {
+        "summary": "Mengambil daftar pengaduan sesuai hak akses",
+        "tags": ["Pengaduan"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Berhasil mengambil daftar pengaduan" },
+          "401": { "description": "Token tidak ada atau tidak valid" }
+        }
+      },
+      "post": {
+        "summary": "Membuat pengaduan baru (Khusus Mahasiswa)",
+        "tags": ["Pengaduan"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PengaduanInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Pengaduan berhasil dibuat" },
+          "400": { "description": "Input tidak valid" },
+          "401": { "description": "Tidak terautentikasi" },
+          "403": { "description": "Bukan role mahasiswa" }
+        }
+      }
+    },
+    "/api/pengaduan/{id}": {
+      "get": {
+        "summary": "Mengambil detail pengaduan berdasarkan ID",
+        "tags": ["Pengaduan"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Detail pengaduan ditemukan" },
+          "403": { "description": "Bukan pemilik pengaduan" },
+          "404": { "description": "Pengaduan tidak ditemukan" }
+        }
+      },
+      "put": {
+        "summary": "Mengubah isi pengaduan sendiri (selama status diajukan)",
+        "tags": ["Pengaduan"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PengaduanInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Pengaduan berhasil diubah" },
+          "400": { "description": "Input tidak valid" },
+          "403": { "description": "Bukan pemilik atau status sudah diproses" },
+          "404": { "description": "Pengaduan tidak ditemukan" }
+        }
+      },
+      "delete": {
+        "summary": "Menghapus pengaduan sendiri (selama status diajukan)",
+        "tags": ["Pengaduan"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Pengaduan berhasil dihapus" },
+          "403": { "description": "Bukan pemilik atau status sudah diproses" },
+          "404": { "description": "Pengaduan tidak ditemukan" }
+        }
+      }
+    },
+    "/api/pengaduan/{id}/status": {
+      "patch": {
+        "summary": "Memperbarui status pengaduan (Khusus Admin)",
+        "tags": ["Pengaduan"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "enum": ["diajukan", "diproses", "selesai"], "example": "diproses" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Status berhasil diperbarui" },
+          "400": { "description": "Status tidak valid" },
+          "403": { "description": "Hanya admin yang diizinkan" },
+          "404": { "description": "Pengaduan tidak ditemukan" }
+        }
+      }
+    }
+  }
+}
